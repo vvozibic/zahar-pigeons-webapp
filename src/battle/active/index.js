@@ -7,10 +7,10 @@ const initialMap = {
   currentRound: 1,
   maxRounds: 5,
   points: [
-    { id: "p1", name: "Лавка у киоска", position: [10, 20], owner: null, defendingBird: null, attackers: [] },
-    { id: "p2", name: "Сквер с фонарём", position: [30, 60], owner: null, defendingBird: null, attackers: [] },
-    { id: "p3", name: "Памятник скамейке", position: [60, 40], owner: null, defendingBird: null, attackers: [] },
-    { id: "p4", name: "Кусты у дорожки", position: [80, 70], owner: null, defendingBird: null, attackers: [] }
+    { id: "p1", name: "Лавка у киоска", position: [15, 30], emoji: "🪑", claimedBy: null, attackers: [] },
+    { id: "p2", name: "Сквер с фонарём", position: [45, 25], emoji: "💡", claimedBy: null, attackers: [] },
+    { id: "p3", name: "Памятник скамейке", position: [65, 60], emoji: "🪑", claimedBy: null, attackers: [] },
+    { id: "p4", name: "Кусты у дорожки", position: [85, 70], emoji: "🌿", claimedBy: null, attackers: [] }
   ]
 };
 
@@ -22,43 +22,40 @@ const initialPigeons = [
   { id: "g5", name: "Фома", power: 1, trait: "Ленивый" }
 ];
 
-function resolveBattle(point) {
-  if (point.attackers.length === 0) return point;
+const initialBotPigeons = [
+  { id: "b1", name: "Шумный", power: 2, trait: "Наглый" },
+  { id: "b2", name: "Васька", power: 1, trait: "Быстрый" },
+  { id: "b3", name: "Булка", power: 3, trait: "Толстый" },
+  { id: "b4", name: "Лёнька", power: 2, trait: "Хитрый" }
+];
 
-  if (point.attackers.length === 1) {
-    const { playerId, pigeon } = point.attackers[0];
-    return {
-      ...point,
-      owner: playerId,
-      defendingBird: pigeon,
-      attackers: []
-    };
+function botAct(points, botPigeons, logs) {
+  const updatedPoints = [...points];
+  const updatedBotPigeons = [...botPigeons];
+
+  const freePoints = updatedPoints.filter(
+    p => !p.attackers.some(a => a.playerId === "bot")
+  );
+
+  if (freePoints.length && updatedBotPigeons.length) {
+    const target = freePoints[Math.floor(Math.random() * freePoints.length)];
+    const pigeon = updatedBotPigeons.shift();
+    target.attackers.push({ playerId: "bot", pigeon });
+    logs.push(`🤖 Бот отправил голубя "${pigeon.name}" (сила: ${pigeon.power}) на "${target.name}"`);
   }
 
-  const results = point.attackers.map(({ playerId, pigeon }) => ({
-    playerId,
-    pigeon,
-    score: pigeon.power + Math.random() * 2
-  }));
-
-  results.sort((a, b) => b.score - a.score);
-
-  const winner = results[0];
-
-  return {
-    ...point,
-    owner: winner.playerId,
-    defendingBird: winner.pigeon,
-    attackers: []
-  };
+  return [updatedPoints, updatedBotPigeons];
 }
 
 export default function BattleScreen() {
   const [battleMap, setBattleMap] = useState(initialMap);
   const [pigeons, setPigeons] = useState(initialPigeons);
+  const [botPigeons, setBotPigeons] = useState(initialBotPigeons);
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [selectedPigeon, setSelectedPigeon] = useState(null);
   const [battleEnded, setBattleEnded] = useState(false);
+  const [finalMap, setFinalMap] = useState(null);
+  const [logs, setLogs] = useState([]);
 
   const handleSendPigeon = () => {
     if (!selectedPoint || !selectedPigeon) return;
@@ -76,46 +73,74 @@ export default function BattleScreen() {
       })
     }));
 
+    setLogs(prev => [
+      ...prev,
+      `🕊 Ты отправил голубя "${selectedPigeon.name}" (сила: ${selectedPigeon.power}) на "${selectedPoint.name}"`
+    ]);
+
     setPigeons(prev => prev.filter(p => p.id !== selectedPigeon.id));
     setSelectedPigeon(null);
     setSelectedPoint(null);
   };
 
   const handleEndRound = () => {
+    const logsCopy = [...logs];
+    const [pointsWithBot, updatedBotPigeons] = botAct(battleMap.points, botPigeons, logsCopy);
+    setBotPigeons(updatedBotPigeons);
+    setLogs(logsCopy);
+
     setBattleMap(prev => {
-      const updatedPoints = prev.points.map(point => resolveBattle(point));
       const nextRound = prev.currentRound + 1;
 
       if (nextRound > prev.maxRounds) {
+        const finalizedPoints = pointsWithBot.map(point => {
+          const groups = point.attackers.reduce((acc, { playerId, pigeon }) => {
+            if (!acc[playerId]) acc[playerId] = [];
+            acc[playerId].push(pigeon);
+            return acc;
+          }, {});
+
+          const sumPower = group => (group || []).reduce((sum, p) => sum + p.power, 0);
+          const powerYou = sumPower(groups["you"]);
+          const powerBot = sumPower(groups["bot"]);
+
+          let claimedBy = null;
+          if (powerYou > powerBot) claimedBy = "you";
+          else if (powerBot > powerYou) claimedBy = "bot";
+          else claimedBy = Math.random() < 0.5 ? "you" : "bot";
+
+          return { ...point, claimedBy };
+        });
+
+        setFinalMap({ ...prev, points: finalizedPoints });
         setBattleEnded(true);
+        return prev;
       }
 
       return {
         ...prev,
-        points: updatedPoints,
+        points: pointsWithBot,
         currentRound: nextRound
       };
     });
   };
 
-  if (battleEnded) {
-    const yourPoints = battleMap.points.filter(point => point.owner === "you").length;
+  if (battleEnded && finalMap) {
+    const yourPoints = finalMap.points.filter(point => point.claimedBy === "you").length;
+    const botPoints = finalMap.points.filter(point => point.claimedBy === "bot").length;
 
     return (
       <div className={styles.container}>
-        <h1 className={styles.title}>🏆 Битва завершена!</h1>
-        <p className={styles.subheading}>Твои результаты:</p>
+        <h1 className={styles.title}>🏁 Битва завершена!</h1>
+        <p className={styles.subheading}>Результаты:</p>
         <ul>
-          <li>Захвачено точек: {yourPoints}</li>
-          <li>Оставшиеся голуби: {pigeons.length}</li>
+          <li>Ты: {yourPoints} точек</li>
+          <li>Бот: {botPoints} точек</li>
         </ul>
         <button
           className={styles.sendButton}
           style={{ marginTop: "20px" }}
-          onClick={() => {
-            setBattleMap(initialMap)
-            setBattleEnded(false)
-          }}
+          onClick={() => window.location.reload()}
         >
           Начать заново
         </button>
@@ -127,48 +152,57 @@ export default function BattleScreen() {
     <div className={styles.container}>
       <h1 className={styles.title}>{battleMap.name} — Раунд {battleMap.currentRound}/{battleMap.maxRounds}</h1>
 
-      <div className={styles.grid}>
+      <div className={styles.mapArea}>
         {battleMap.points.map(point => (
-          <button
+          <div
             key={point.id}
-            className={`${styles.point} ${selectedPoint?.id === point.id ? styles.selected : ''}`}
+            className={`${styles.pointIcon} ${selectedPoint?.id === point.id ? styles.selected : ''}`}
+            style={{ top: `${point.position[1]}%`, left: `${point.position[0]}%` }}
             onClick={() => setSelectedPoint(point)}
+            title={point.name}
           >
-            <strong>{point.name}</strong><br />
-            Владелец: {point.owner || "—"}<br />
-            Голубей атакует: {point.attackers.length}
-          </button>
+            <span style={{ fontSize: '48px' }}>{point.emoji}</span>
+          </div>
         ))}
       </div>
 
-      <h2 className={styles.subheading}>Твоя стая:</h2>
-      <div className={styles.pigeonList}>
-        {pigeons.map(pigeon => (
-          <button
-            key={pigeon.id}
-            className={`${styles.pigeon} ${selectedPigeon?.id === pigeon.id ? styles.selected : ''}`}
-            onClick={() => setSelectedPigeon(pigeon)}
-          >
-            🕊 {pigeon.name} — Сила: {pigeon.power} — {pigeon.trait}
-          </button>
+      {/* <h2 className={styles.subheading}>Лог боя:</h2>
+      <ul className={styles.battleLog}>
+        {logs.slice().reverse().map((log, i) => (
+          <li key={i}>{log}</li>
         ))}
+      </ul> */}
+
+      <div className={styles.pigeonPanel}>
+        <h2 className={styles.subheading}>Твоя стая:</h2>
+        <div className={styles.pigeonList}>
+          {pigeons.map(pigeon => (
+            <button
+              key={pigeon.id}
+              className={`${styles.pigeon} ${selectedPigeon?.id === pigeon.id ? styles.selected : ''}`}
+              onClick={() => setSelectedPigeon(pigeon)}
+            >
+              🕊 {pigeon.name} — Сила: {pigeon.power} — {pigeon.trait}
+            </button>
+          ))}
+        </div>
+
+        <button
+          className={styles.sendButton}
+          disabled={!selectedPoint || !selectedPigeon}
+          onClick={handleSendPigeon}
+        >
+          Отправить голубя в бой
+        </button>
+
+        <button
+          className={styles.sendButton}
+          style={{ marginTop: "10px", backgroundColor: "#28a745" }}
+          onClick={handleEndRound}
+        >
+          Завершить раунд
+        </button>
       </div>
-
-      <button
-        className={styles.sendButton}
-        disabled={!selectedPoint || !selectedPigeon}
-        onClick={handleSendPigeon}
-      >
-        Отправить голубя в бой
-      </button>
-
-      <button
-        className={styles.sendButton}
-        style={{ marginTop: "10px", backgroundColor: "#28a745" }}
-        onClick={handleEndRound}
-      >
-        Завершить раунд
-      </button>
     </div>
   );
 }

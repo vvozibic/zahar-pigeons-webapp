@@ -5,78 +5,93 @@
   background-color: #f8f5f0;
 }
 
+.container h1, 
+.container h2 {
+  margin: 5px 0;
+}
+
 .title {
   font-size: 1.5rem;
   font-weight: bold;
   text-align: center;
   margin-bottom: 16px;
 }
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
+.mapArea {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  background: #e6f0ff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  /* margin-bottom: 1rem; */
+  overflow: hidden;
 }
 
-.point {
-  padding: 12px;
-  border: 2px solid #ddd;
-  border-radius: 12px;
-  background-color: #fff;
-  text-align: left;
+.pointIcon {
+  position: absolute;
+  transform: translate(-50%, -50%);
   cursor: pointer;
-  transition: 0.2s;
+  transition: transform 0.2s;
 }
 
-.point:hover {
-  background-color: #f0f0f0;
+.pointIcon:hover {
+  transform: translate(-50%, -50%) scale(1.1);
 }
 
 .selected {
-  border-color: #ffc107;
-  background-color: #fff8dc;
+  filter: drop-shadow(0 0 5px gold);
 }
 
-.subheading {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: 8px;
+.pigeonPanel {
+  position: relative;
+  background: #f4f4f4;
+  padding: 12px;
+  /* border-top: 2px solid #ccc; */
+  /* margin-top: 1rem; */
+  border-radius: 12px;
 }
 
 .pigeonList {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+  /* margin-bottom: 1rem;  */
 }
 
 .pigeon {
-  padding: 10px;
-  border: 2px solid #ccc;
-  border-radius: 10px;
-  background-color: #fff;
-  font-size: 0.9rem;
+  background: white;
+  border: 1px solid #bbb;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 14px;
   cursor: pointer;
-  transition: 0.2s;
+  transition: background 0.2s;
 }
 
 .pigeon:hover {
-  background-color: #f2f2f2;
+  background: #eee;
+}
+
+.pigeon.selected {
+  background: #ffd700;
+}
+
+.battleLog {
+  list-style: none;
+  padding-left: 0;
+  font-size: 14px;
+  max-height: 120px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
 }
 
 .sendButton {
-  padding: 12px;
-  font-size: 1rem;
-  background-color: #3498db;
-  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 16px;
   border: none;
-  border-radius: 10px;
   cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.sendButton:disabled {
-  background-color: #bbb;
-  cursor: not-allowed;
+  background-color: #007bff;
+  color: white;
+  margin-right: 8px;
 }
